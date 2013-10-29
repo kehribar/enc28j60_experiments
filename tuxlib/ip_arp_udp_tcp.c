@@ -59,6 +59,14 @@ static uint8_t (*client_tcp_result_callback)(uint8_t,uint8_t,uint16_t,uint16_t);
 static uint16_t (*client_tcp_datafill_callback)(uint8_t);
 #endif
 
+/* --------------------------------------------*/
+/* Added by ihsan Kehribar */
+uint8_t get_tcp_client_state()
+{
+    return tcp_client_state;
+}
+/* --------------------------------------------*/
+
 #define TCPCLIENT_SRC_PORT_H 11
 
 #if defined (WWW_client)
@@ -522,7 +530,7 @@ void make_udp_reply_from_request_udpdat_ready(uint8_t *buf,uint16_t datalen,uint
         //buf[UDP_DST_PORT_L_P]=port & 0xff;
         // sent to port of sender and use "port" as own source:
         buf[UDP_DST_PORT_H_P]=buf[UDP_SRC_PORT_H_P];
-        buf[UDP_DST_PORT_L_P]=buf[UDP_SRC_PORT_L_P];
+        buf[UDP_DST_PORT_L_P]= buf[UDP_SRC_PORT_L_P];
         buf[UDP_SRC_PORT_H_P]=port>>8;
         buf[UDP_SRC_PORT_L_P]=port & 0xff;
         // calculte the udp length:
@@ -1396,7 +1404,7 @@ uint16_t packetloop_arp_icmp_tcp(uint8_t *buf,uint16_t plen)
                                 // parameters in client_tcp_result_callback: fd, status, buf_start, len
                                 (*client_tcp_result_callback)((buf[TCP_DST_PORT_L_P]>>5)&0x7,3,0,0);
                         }
-                        tcp_client_state=6;
+                        tcp_client_state=5;
                         return(0);
                 }
                 len=get_tcp_data_len(buf);
@@ -1462,25 +1470,11 @@ uint16_t packetloop_arp_icmp_tcp(uint8_t *buf,uint16_t plen)
                         }
                 }
                 if(tcp_client_state==5){
-                        // we get one more final ack to our fin-ack:
-                        if (buf[TCP_FLAGS_P] & TCP_FLAGS_ACK_V){
-                                tcp_client_state=6; // in state 6 communication should be finished
-                        }
-                        return(0);
-                }
-                if(tcp_client_state==6){
-                        // something wrong, can't deal with this, reset the connection
-                        len++;
-                        if (buf[TCP_FLAGS_P] & TCP_FLAGS_ACK_V) len=0; // if packet was an ack then do not step the ack number
-                        make_tcp_ack_from_any(buf,len,TCP_FLAGS_RST_V);
-                        // just a single reset, do not repeat if more messages:
-                        tcp_client_state=7;
+                        // no more ack
                         return(0);
                 }
                 if (buf[TCP_FLAGS_P] & TCP_FLAGS_FIN_V){
-                        // this normally a fin ack message but it could be
-                        // any message with fin we answer with fin-ack:
-                        make_tcp_ack_from_any(buf,len+1,TCP_FLAGS_FIN_V);
+                        make_tcp_ack_from_any(buf,len+1,TCP_FLAGS_PUSH_V|TCP_FLAGS_FIN_V);
                         tcp_client_state=5; // connection terminated
                         return(0);
                 }

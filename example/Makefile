@@ -10,13 +10,16 @@ PROJECT = main
 ### Source files and search directory
 CSRC    = main.c 
 CSRC   += dhcp_client.c dnslkup.c enc28j60.c ip_arp_udp_tcp.c websrv_help_functions.c
+CSRC   += hal_hci.c hal_serial.c hal_timer.c
 ASRC    = xitoa.S
-VPATH   = ../tuxlib ./serial_lib 
+VPATH   = ../tuxlib ../hal
 DEVICE  = atmega328p
-F_OSC   = 16000000
+F_OSC   = 8000000
 PORT 	= /dev/tty.usbserial-A900cbrd 
-AVRDUDE = avrdude -c arduino -p ${DEVICE} -U flash:w:$(PROJECT).hex -P ${PORT} -B 115200
-RESET   = avrdude -c arduino -p ${DEVICE} -P ${PORT} -B 115200
+# AVRDUDE = avrdude -c arduino -p ${DEVICE} -U flash:w:$(PROJECT).hex -P ${PORT} -B 115200
+# RESET   = avrdude -c arduino -p ${DEVICE} -P ${PORT} -B 115200
+AVRDUDE = avrdude -c usbtiny -p ${DEVICE} -U flash:w:$(PROJECT).hex -B 1
+RESET   = avrdude -c usbtiny -p ${DEVICE}
 
 ###############################################################################
 #

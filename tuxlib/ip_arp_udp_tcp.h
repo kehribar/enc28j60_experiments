@@ -17,6 +17,11 @@
 #define __PROG_TYPES_COMPAT__
 #include <avr/pgmspace.h>
 
+ /* --------------------------------------------*/
+/* Added by ihsan Kehribar */
+extern uint8_t get_tcp_client_state();
+/* --------------------------------------------*/
+
 // set my own mac address:
 extern void init_mac(uint8_t *mymac); // not needed if you call init_udp_or_www_server
 // -- web server functions --
@@ -83,8 +88,6 @@ uint8_t get_mac_with_arp_wait(void); // checks current ongoing transaction, retu
 #endif
 
 #ifdef TCP_client
-// NOTE: the TCP (and WWW) client code has only one state machine (to save space). You must not sent requests too quickly otherwise they can interfere. It is recommended to wait 20sec before initiating a new request.
-//
 // To use the tcp client you need to:
 //
 // Declare a callback function to get the result (tcp data from the server):
@@ -134,7 +137,6 @@ extern uint8_t client_tcp_req(uint8_t (*result_callback)(uint8_t fd,uint8_t stat
 #endif
 
 #ifdef WWW_client
-// NOTE: the TCP (and WWW) client code has only one state machine (to save space). You must not sent requests too quickly otherwise they can interfere. It is recommended to wait 20sec before initiating a new request.
 // ----- http get
 // The string buffers to which urlbuf_varpart and hoststr are pointing
 // must not be changed until the callback is executed.

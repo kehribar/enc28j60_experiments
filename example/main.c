@@ -29,6 +29,7 @@
 #include "../pt/pt.h"
 #include "../hal/hal.h"
 #include "../tuxlib/tuxlib.h"
+#include "../microcoap/coap.h"
 /*---------------------------------------------------------------------------*/
 #if 1
     #define dbg(...) xprintf(__VA_ARGS__)
@@ -42,6 +43,7 @@
 /*---------------------------------------------------------------------------*/
 #define udp_server_flag 0
 #define www_server_flag 1
+#define coap_server_flag 2
 /*---------------------------------------------------------------------------*/
 #define set_flag(reg,bit) (reg|=(1<<bit))
 #define check_flag(reg,bit) (reg&(1<<bit))
@@ -56,6 +58,7 @@
 static struct pt www_server_pt;
 static struct pt udp_server_pt;
 static struct pt www_client_pt;
+static struct pt coap_server_pt;
 static struct pt udp_broadcast_pt;
 /*---------------------------------------------------------------------------*/
 static uint16_t dat_p;
@@ -230,6 +233,12 @@ PT_THREAD(udp_broadcast_thread(struct pt *pt))
     PT_END(pt);
 }
 /*---------------------------------------------------------------------------*/
+uint8_t return_counter()
+{
+    dbg(PSTR("> %d\r\n"),www_client_counter);
+    return 0;
+}
+/*---------------------------------------------------------------------------*/
 static
 PT_THREAD(www_client_thread(struct pt *pt))
 {
@@ -286,7 +295,7 @@ PT_THREAD(www_client_thread(struct pt *pt))
             );
 
             /* wait ... */
-            PT_WAIT_UNTIL(pt,www_client_failed() || www_client_timeout() || www_client_ok() );
+            PT_WAIT_UNTIL(pt,www_client_failed() || www_client_timeout() || www_client_ok() || return_counter() );
 
             if(www_client_ok())
             {
@@ -335,6 +344,7 @@ int main(void)
     PT_INIT(&www_client_pt);
     PT_INIT(&www_server_pt);
     PT_INIT(&udp_server_pt);
+    PT_INIT(&coap_server_pt);    
     PT_INIT(&udp_broadcast_pt);
 
     /* greeting message */

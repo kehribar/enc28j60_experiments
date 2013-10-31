@@ -68,6 +68,7 @@
 #define www_client_timeout() (www_client_counter > 60)
 #define www_client_failed() (get_tcp_client_state() == 5)
 /*---------------------------------------------------------------------------*/
+static struct pt blink_pt;
 static struct pt www_server_pt;
 static struct pt udp_server_pt;
 static struct pt www_client_pt;
@@ -104,12 +105,7 @@ ISR(TIMER1_COMPA_vect) /* 100ms intervals */
 {
     dhcp_counter++;
     timer1_counter++;
-    www_client_counter++;    
-    if(timer1_counter == 5)
-    {
-        timer1_counter = 0;
-        led1_toggle();
-    }
+    www_client_counter++;        
     if(dhcp_counter == 60)
     {
         dhcp_counter = 0;
@@ -227,6 +223,37 @@ PT_THREAD(udp_server_thread(struct pt *pt))
         clear_flag(new_packet,udp_server_flag);
     }
 
+    PT_END(pt);
+}
+/*---------------------------------------------------------------------------*/
+static
+PT_THREAD(blink_thread(struct pt *pt))
+{
+    PT_BEGIN(pt);
+    
+    while(1)
+    {
+        led1_high();
+        
+        cli();
+        
+        timer1_counter = 0;
+        
+        sei();
+        
+        PT_WAIT_UNTIL(pt,timer1_counter > 5);
+
+        led1_low();
+        
+        cli();
+        
+        timer1_counter = 0;
+        
+        sei();
+        
+        PT_WAIT_UNTIL(pt,timer1_counter > 5);
+    }
+    
     PT_END(pt);
 }
 /*---------------------------------------------------------------------------*/
@@ -401,7 +428,11 @@ int main(void)
     init_serial();    
     sei();
 
+    led1_high();
+    led2_high();
+
     /* init protothreads */
+    PT_INIT(&blink_pt);
     PT_INIT(&www_client_pt);
     PT_INIT(&www_server_pt);
     PT_INIT(&udp_server_pt);
@@ -439,6 +470,9 @@ int main(void)
     
     dbg(PSTR("> System is ready.\r\n"));   
 
+    led1_low();
+    led2_low();
+
     /* main loop */
     while(1)
     {    
@@ -463,6 +497,7 @@ int main(void)
 
             new_packet = 0xFF;
             
+            PT_SCHEDULE(blink_thread(&blink_pt));
             PT_SCHEDULE(www_server_thread(&www_server_pt));
             PT_SCHEDULE(udp_server_thread(&udp_server_pt));
             PT_SCHEDULE(www_client_thread(&www_client_pt));

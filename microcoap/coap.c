@@ -364,5 +364,6 @@ next:
 
 void coap_setup(void)
 {
+    
 }
 

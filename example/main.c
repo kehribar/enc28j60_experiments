@@ -236,6 +236,7 @@ PT_THREAD(coap_server_thread(struct pt *pt))
     PT_BEGIN(pt);
 
     uint16_t xt;
+    uint16_t tmp;
 
     while(1)
     {
@@ -244,26 +245,26 @@ PT_THREAD(coap_server_thread(struct pt *pt))
         if((buf[IP_PROTO_P]==IP_PROTO_UDP_V) && (buf[UDP_DST_PORT_H_P]==(COAPPORT>>8)) && (buf[UDP_DST_PORT_L_P]==(COAPPORT&0xff)))
         {
             /* UDP message length calculation */
-            xt = (buf[UDP_LEN_H_P] << 8) + buf[UDP_LEN_L_P];
+            xt = ((buf[UDP_LEN_H_P]<<8)+buf[UDP_LEN_L_P])-8;
 
-            xt -= 8;
+            #if 1
 
-            if(coap_parse(&pkt,buf+UDP_DATA_P,xt) != 0)
-            {
-                dbg(PSTR("\r\n> Bad coap packet\r\n"));             
-            }
-            else
-            {            
-                coap_handle_req(&scratch_buf, &pkt, &rsppkt);
-                
-                xt = sizeof(response);
+                if(coap_parse(&pkt,buf+UDP_DATA_P,xt) != 0)
+                {
+                    dbg(PSTR("\r\n> Bad coap packet\r\n"));             
+                }
+                else
+                {            
+                    coap_handle_req(&scratch_buf, &pkt, &rsppkt);
+                    
+                    xt = sizeof(response);
 
-                coap_build(response, &xt, &rsppkt);
-                
-                make_udp_reply_from_request(buf,response,xt,COAPPORT);                                       
+                    coap_build(response, &xt, &rsppkt);
+                    
+                    make_udp_reply_from_request(buf,response,xt,COAPPORT);                                       
+                }
 
-            }
-        
+            #endif
         }
 
         clear_flag(new_packet,coap_server_flag);
@@ -461,13 +462,12 @@ int main(void)
             } 
 
             new_packet = 0xFF;
-
-            PT_SCHEDULE(coap_server_thread(&coap_server_pt));
+            
             PT_SCHEDULE(www_server_thread(&www_server_pt));
             PT_SCHEDULE(udp_server_thread(&udp_server_pt));
-            PT_SCHEDULE(www_client_thread(&www_client_pt));            
+            PT_SCHEDULE(www_client_thread(&www_client_pt));
+            PT_SCHEDULE(coap_server_thread(&coap_server_pt));
             PT_SCHEDULE(udp_broadcast_thread(&udp_broadcast_pt));
-
         }
     }    
     return 0;

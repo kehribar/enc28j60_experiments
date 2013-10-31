@@ -32,7 +32,7 @@ RESET   = avrdude -c usbtiny -p ${DEVICE}
 LIBS	=
 LIBDIRS	=
 INCDIRS	=
-DEFS	= F_CPU=$(F_OSC) DEBUG
+DEFS	= F_CPU=$(F_OSC)
 ADEFS	= F_CPU=$(F_OSC)
 
 ### Optimization level (0, 1, 2, 3, 4 or s)

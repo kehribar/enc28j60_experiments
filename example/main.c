@@ -39,6 +39,7 @@
 /*---------------------------------------------------------------------------*/
 #define MYWWWPORT 80
 #define MYUDPPORT 1200
+#define COAPPORT 5683
 #define BUFFER_SIZE 1024
 /*---------------------------------------------------------------------------*/
 #define udp_server_flag 0
@@ -61,6 +62,13 @@ static struct pt www_client_pt;
 static struct pt coap_server_pt;
 static struct pt udp_broadcast_pt;
 /*---------------------------------------------------------------------------*/
+static coap_packet_t pkt;
+static uint8_t response[64];
+static coap_packet_t rsppkt;
+static uint8_t scratch_raw[32];
+static coap_rw_buffer_t scratch_buf = {scratch_raw, sizeof(scratch_raw)};
+/*---------------------------------------------------------------------------*/
+static uint16_t plen;
 static uint16_t dat_p;
 volatile uint8_t new_packet;
 static uint8_t dhcp_counter;
@@ -211,6 +219,47 @@ PT_THREAD(udp_server_thread(struct pt *pt))
 }
 /*---------------------------------------------------------------------------*/
 static
+PT_THREAD(coap_server_thread(struct pt *pt))
+{
+    PT_BEGIN(pt);
+
+    uint16_t xt;
+
+    while(1)
+    {
+        PT_WAIT_UNTIL(pt,check_flag(new_packet,coap_server_flag));
+
+        if((buf[IP_PROTO_P]==IP_PROTO_UDP_V) && (buf[UDP_DST_PORT_H_P]==(COAPPORT>>8)) && (buf[UDP_DST_PORT_L_P]==(COAPPORT&0xff)))
+        {
+            /* UDP message length calculation */
+            xt = (buf[UDP_LEN_H_P] << 8) + buf[UDP_LEN_L_P];
+
+            xt -= 8;
+
+            if(coap_parse(&pkt,buf+UDP_DATA_P,xt) != 0)
+            {
+                dbg(PSTR("\r\n> Bad coap packet\r\n"));             
+            }
+            else
+            {            
+                coap_handle_req(&scratch_buf, &pkt, &rsppkt);
+                
+                xt = sizeof(response);
+
+                coap_build(response, &xt, &rsppkt);
+                
+                make_udp_reply_from_request(buf,response,xt,COAPPORT);                                       
+
+            }
+        
+        }
+
+        clear_flag(new_packet,coap_server_flag);
+    }
+
+    PT_END(pt);
+}/*---------------------------------------------------------------------------*/
+static
 PT_THREAD(udp_broadcast_thread(struct pt *pt))
 {
     PT_BEGIN(pt);
@@ -332,7 +381,6 @@ PT_THREAD(www_client_thread(struct pt *pt))
 int main(void)
 {   
     uint16_t rval;     
-    uint16_t plen;   
 
     /* init hardware layer */
     init_hci();
@@ -382,10 +430,10 @@ int main(void)
     while(1)
     {    
         if(enc28j60linkup())
-        {
+        {            
             /* poll hardware ethernet buffer */
-            plen = enc28j60PacketReceive(BUFFER_SIZE,buf);      
-
+            plen = enc28j60PacketReceive(BUFFER_SIZE,buf);     
+            
             /* terminate the buffer */
             buf[BUFFER_SIZE]='\0';
 
@@ -402,10 +450,12 @@ int main(void)
 
             new_packet = 0xFF;
 
+            PT_SCHEDULE(coap_server_thread(&coap_server_pt));
             PT_SCHEDULE(www_server_thread(&www_server_pt));
             PT_SCHEDULE(udp_server_thread(&udp_server_pt));
-            PT_SCHEDULE(www_client_thread(&www_client_pt));
+            PT_SCHEDULE(www_client_thread(&www_client_pt));            
             PT_SCHEDULE(udp_broadcast_thread(&udp_broadcast_pt));
+
         }
     }    
     return 0;

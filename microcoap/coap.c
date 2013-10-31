@@ -1,3 +1,6 @@
+/*-----------------------------------------------------------------------------
+/   Obtained from: https://github.com/1248/microcoap
+/----------------------------------------------------------------------------*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -5,19 +8,22 @@
 #include <string.h>
 #include <stddef.h>
 #include "coap.h"
+#include <avr/pgmspace.h>
 
 extern void endpoint_setup(void);
 extern const coap_endpoint_t endpoints[];
 
+extern void xprintf(const prog_char *format, ...);
+
 #ifdef DEBUG
 void coap_dumpHeader(coap_header_t *hdr)
 {
-    printf("Header:\n");
-    printf("  ver  0x%02X\n", hdr->ver);
-    printf("  t    0x%02X\n", hdr->ver);
-    printf("  tkl  0x%02X\n", hdr->tkl);
-    printf("  code 0x%02X\n", hdr->code);
-    printf("  id   0x%02X%02X\n", hdr->id[0], hdr->id[1]);
+    xprintf(PSTR("Header:\n"));
+    xprintf(PSTR("  ver  0x%02X\n"), hdr->ver);
+    xprintf(PSTR("  t    0x%02X\n"), hdr->ver);
+    xprintf(PSTR("  tkl  0x%02X\n"), hdr->tkl);
+    xprintf(PSTR("  code 0x%02X\n"), hdr->code);
+    xprintf(PSTR("  id   0x%02X%02X\n"), hdr->id[0], hdr->id[1]);
 }
 #endif
 
@@ -27,14 +33,14 @@ void coap_dump(const uint8_t *buf, size_t buflen, bool bare)
     if (bare)
     {
         while(buflen--)
-            printf("%02X%s", *buf++, (buflen > 0) ? " " : "");
+            xprintf(PSTR("%02X%s"), *buf++, (buflen > 0) ? " " : "");
     }
     else
     {
-        printf("Dump: ");
+        xprintf(PSTR("Dump: "));
         while(buflen--)
-            printf("%02X%s", *buf++, (buflen > 0) ? " " : "");
-        printf("\n");
+            xprintf(PSTR("%02X%s"), *buf++, (buflen > 0) ? " " : "");
+        xprintf(PSTR("\n"));
     }
 }
 #endif
@@ -117,7 +123,7 @@ int coap_parseOption(coap_option_t *option, uint16_t *running_delta, const uint8
     if ((p + 1 + len) > (*buf + buflen))
         return COAP_ERR_OPTION_TOO_BIG;
 
-    //printf("option num=%d\n", delta + *running_delta);
+    //xprintf(PSTR("option num=%d\n"), delta + *running_delta);
     option->num = delta + *running_delta;
     option->buf.p = p+1;
     option->buf.len = len;
@@ -170,12 +176,12 @@ int coap_parseOptionsAndPayload(coap_option_t *options, uint8_t *numOptions, coa
 void coap_dumpOptions(coap_option_t *opts, size_t numopt)
 {
     size_t i;
-    printf(" Options:\n");
+    xprintf(PSTR(" Options:\n"));
     for (i=0;i<numopt;i++)
     {
-        printf("  0x%02X [ ", opts[i].num);
+        xprintf(PSTR("  0x%02X [ "), opts[i].num);
         coap_dump(opts[i].buf.p, opts[i].buf.len, true);
-        printf(" ]\n");
+        xprintf(PSTR(" ]\n"));
     }
 }
 #endif
@@ -185,9 +191,9 @@ void coap_dumpPacket(coap_packet_t *pkt)
 {
     coap_dumpHeader(&pkt->hdr);
     coap_dumpOptions(pkt->opts, pkt->numopts);
-    printf("Payload: ");
+    xprintf(PSTR("Payload: "));
     coap_dump(pkt->payload.p, pkt->payload.len, true);
-    printf("\n");
+    xprintf(PSTR("\n"));
 }
 #endif
 

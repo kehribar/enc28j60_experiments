@@ -4,11 +4,23 @@
 /
 /------------------------------------------------------------------------------
 /   DHCP client + web server + web client + UDP broadcast + UDP server 
+/   + CoAP server
 /------------------------------------------------------------------------------
 /   Uses protothreads for psuedo multithreading
 /------------------------------------------------------------------------------
 /   Button1 triggers UDP broadcast
 /   Button2 triggers web client action
+/------------------------------------------------------------------------------
+/   To test the CoAP server, use libcoap
+/
+/   ./coap-client -v 100 -m get coap://{device_ip}/.well-known/core
+/   ./coap-client -v 100 -m get coap://{device_ip}/light
+/   ./coap-client -e "1" -m put coap://{device_ip}/light
+/   ./coap-client -e "0" -m put coap://{device_ip}/light
+/
+/   Or use copper (Firefox plugin)
+/
+/   coap://{device_ip}
 /------------------------------------------------------------------------------
 /   F_OSC: 8 Mhz
 /   Web server port: 80

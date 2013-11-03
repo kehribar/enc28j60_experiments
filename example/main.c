@@ -116,21 +116,54 @@ ISR(TIMER1_COMPA_vect) /* 100ms intervals */
 /*---------------------------------------------------------------------------*/
 void browserresult_callback(uint16_t webstatuscode,uint16_t datapos,uint16_t len)
 {  
-    dbg(PSTR("> -------------------------------------\r\n"));
-    dbg(PSTR("> Status code: %d\r\n"),webstatuscode);
-    dbg(PSTR("> Datapos: %d\r\n"),datapos);
-    dbg(PSTR("> Len: %d\r\n"),len);
-    dbg(PSTR("> -------------------------------------\r\n"));
     #if 1
-        uint16_t q = 0;  
-        dbg(PSTR("> Returned HTTP data: \r\n"));    
         dbg(PSTR("> -------------------------------------\r\n"));
+        dbg(PSTR("> Status code: %d\r\n"),webstatuscode);
+        dbg(PSTR("> Datapos: %d\r\n"),datapos);
+        dbg(PSTR("> Len: %d\r\n"),len);
+        dbg(PSTR("> -------------------------------------\r\n"));
+    #endif
+
+    #if 1
+        uint16_t q;        
+        dbg(PSTR("> Complete HTTP message: \r\n"));    
+        dbg(PSTR("> -------------------------------------\r\n"));        
+        
         for(q=datapos;q<(datapos+len);q++)
         {
             dbg(PSTR("%c"),buf[q]);
         }    
-        dbg(PSTR("\r\r> -------------------------------------\r\n"));
+        
+        dbg(PSTR("\r\r> -------------------------------------\r\n"));        
     #endif
+
+    #if 1
+        uint16_t qx;
+        uint16_t qxx;        
+        
+        dbg(PSTR("> -------------------------------------\r\n"));
+        dbg(PSTR("> Returned actual message: \r\n"));
+        dbg(PSTR("> -------------------------------------\r\n"));        
+
+        /* This loop finds the location of actual data that comes with the HTTP response */
+        for(qx=datapos;qx<(datapos+len-4);qx++)
+        {
+            if((buf[qx+0] == '\r') && (buf[qx+1] == '\n') && (buf[qx+2] == '\r') && (buf[qx+3] == '\n'))
+            {        
+                for (qxx = qx+4; qxx < datapos+len; ++qxx)
+                {
+                    /* print the actual contents */
+                    dbg(PSTR("%c"),buf[qxx]);
+
+                    /* break the loop */
+                    qx = 0xFFF0;
+                }
+            }
+        }
+
+        dbg(PSTR("> -------------------------------------\r\n"));
+    #endif
+
     www_callback_state = 1;   
 }
 /*---------------------------------------------------------------------------*/

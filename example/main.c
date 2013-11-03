@@ -62,7 +62,7 @@
 #define check_flag(reg,bit) (reg&(1<<bit))
 #define clear_flag(reg,bit) (reg&=~(1<<bit))
 /*---------------------------------------------------------------------------*/
-#define URL_base_address "api.openweathermap.org"
+#define URL_base_address "rainycloud.kehribar.me"
 /*---------------------------------------------------------------------------*/
 #define www_client_ok() (www_callback_state == 1)
 #define www_client_timeout() (www_client_counter > 60)
@@ -83,6 +83,7 @@ static coap_rw_buffer_t scratch_buf = {scratch_raw, sizeof(scratch_raw)};
 /*---------------------------------------------------------------------------*/
 static uint16_t plen;
 static uint16_t dat_p;
+static uint8_t retry_count;
 volatile uint8_t new_packet;
 static uint8_t dhcp_counter;
 static uint8_t timer1_counter;
@@ -331,9 +332,7 @@ uint8_t return_counter()
 static
 PT_THREAD(www_client_thread(struct pt *pt))
 {
-    PT_BEGIN(pt);
-
-    uint8_t retry_count = 0;
+    PT_BEGIN(pt);    
 
     while(1)
     {
@@ -343,22 +342,8 @@ PT_THREAD(www_client_thread(struct pt *pt))
 
         dbg(PSTR("> Web client starts.\r\n"));
 
-        /* make a dns request */
-        dnslkup_request(buf,URL_base_address,gwmac);
-
-        /* wait an answer ... */
-        PT_WAIT_UNTIL(pt,dnslkup_haveanswer());
-
-        /* save the received IP to your userspace variable */
-        dnslkup_get_ip(otherside_www_ip);
-
-        /* reset callback state */
-        www_callback_state = 0;
-
-        /* reset retry count */
         retry_count = 0;
-
-        /* browsing action */
+        
         do
         {
             /* disable interrupts */
@@ -370,49 +355,97 @@ PT_THREAD(www_client_thread(struct pt *pt))
             /* re-enable interrupts */
             sei(); 
 
-            /* increment the trial counter */
-            retry_count++;
+            /* make a dns request */
+            dnslkup_request(buf,URL_base_address,gwmac);
 
-            /* answer of this API request doesn't fit to a single TCP message ... */
-            client_browse_url(
-                PSTR("/data/2.5/weather?mode=json&q="), /* constant part of the URL suffix */
-                "London", /* variable part of the URL which comes after the constant suffix */
-                URL_base_address, /* base-name of the web page we want to browse */
-                &browserresult_callback, /* callback function for our URL browsing attempt */
-                otherside_www_ip, /* IP representation of the webpage host */
-                gwmac /* mac address of our gateway */
-            );
+            /* wait an answer ... */
+            PT_WAIT_UNTIL(pt,dnslkup_haveanswer()||www_client_timeout());
 
-            /* wait ... */
-            PT_WAIT_UNTIL(pt,www_client_failed() || www_client_timeout() || www_client_ok() || return_counter() );
-
-            if(www_client_ok())
+            if(dnslkup_haveanswer())
             {
                 /* exit the loop */
                 retry_count = 0xFF;              
-            }
-            else if(www_client_failed())
+            }            
+            else
             {
-                dbg(PSTR("> Browsing problem!\r\n"));
+                dbg(PSTR("> DNS lookup timeout!\r\n"));
+                retry_count++;
             }
-            else if(www_client_timeout())
-            {
-                dbg(PSTR("> Browsing timeout!\r\n"));
-            }
+
         }
         while(retry_count < 5);
 
-        if(retry_count == 0xFF)
+        if(dnslkup_haveanswer())
         {
-            dbg(PSTR("> Browsing went ok!\r\n"));  
+            /* save the received IP to your userspace variable */
+            dnslkup_get_ip(otherside_www_ip);
+
+            /* reset callback state */
+            www_callback_state = 0;
+
+            /* reset retry count */
+            retry_count = 0;
+
+            /* browsing action */
+            do
+            {
+                /* disable interrupts */
+                cli(); 
+
+                /* reset timeout counter */
+                www_client_counter = 0; 
+                
+                /* re-enable interrupts */
+                sei(); 
+
+                /* increment the trial counter */
+                retry_count++;
+                
+                client_browse_url(
+                    PSTR("/ws.php?c="), /* constant part of the URL suffix */
+                    "London", /* variable part of the URL which comes after the constant suffix */
+                    URL_base_address, /* base-name of the web page we want to browse */
+                    &browserresult_callback, /* callback function for our URL browsing attempt */
+                    otherside_www_ip, /* IP representation of the webpage host */
+                    gwmac /* mac address of our gateway */
+                );                
+
+                /* wait ... */
+                PT_WAIT_UNTIL(pt,www_client_failed() || www_client_timeout() || www_client_ok() || return_counter() );
+
+                if(www_client_ok())
+                {
+                    /* exit the loop */
+                    retry_count = 0xFF;              
+                }
+                else if(www_client_failed())
+                {
+                    dbg(PSTR("> Browsing problem!\r\n"));
+                }
+                else if(www_client_timeout())
+                {
+                    dbg(PSTR("> Browsing timeout!\r\n"));
+                }
+            }
+            while(retry_count < 5);
+
+            if(retry_count == 0xFF)
+            {
+                dbg(PSTR("> Browsing went ok!\r\n"));  
+            }
+            else
+            {
+                dbg(PSTR("> Browsing failed!\r\n"));     
+            }
+
+            dbg(PSTR("> -------------------------------------\r\n"));
         }
         else
         {
             dbg(PSTR("> Browsing failed!\r\n"));     
+            dbg(PSTR("> -------------------------------------\r\n"));
         }
-
-        dbg(PSTR("> -------------------------------------\r\n"));
-
+        
     }
 
     PT_END(pt);

@@ -43,6 +43,9 @@
 #include "../tuxlib/tuxlib.h"
 #include "../microcoap/coap.h"
 /*---------------------------------------------------------------------------*/
+#include "../nrf24l01_plus/nrf24.h"
+#include "../nrf24l01_plus/nRF24L01.h"
+/*---------------------------------------------------------------------------*/
 #if 1
     #define dbg(...) xprintf(__VA_ARGS__)
 #else
@@ -68,7 +71,12 @@
 #define www_client_timeout() (www_client_counter > 60)
 #define www_client_failed() (get_tcp_client_state() == 5)
 /*---------------------------------------------------------------------------*/
+uint8_t data_array[8];
+uint8_t rx_address[5] = {0xE7,0xE7,0xE7,0xE7,0xE7};
+uint8_t tx_address[5] = {0xD7,0xD7,0xD7,0xD7,0xD7};
+/*---------------------------------------------------------------------------*/
 static struct pt blink_pt;
+static struct pt nrf24_pt;
 static struct pt www_server_pt;
 static struct pt udp_server_pt;
 static struct pt www_client_pt;
@@ -248,7 +256,7 @@ PT_THREAD(temperature_thread(struct pt *pt))
         
         sei();
 
-        PT_WAIT_UNTIL(pt,temperature_counter > 100);
+        PT_WAIT_UNTIL(pt,temperature_counter > 750);
 
         temp_result = 0;
         temp_sampl_cnt = 0;
@@ -262,7 +270,7 @@ PT_THREAD(temperature_thread(struct pt *pt))
             temp_result += read_adc();
         }        
 
-        dbg(PSTR("> result: %u\r\n"),temp_result >> 6);
+        dbg(PSTR("> ADC result: %u\r\n"),temp_result >> 6);
     }
 
     PT_END(pt);
@@ -319,6 +327,55 @@ PT_THREAD(blink_thread(struct pt *pt))
         led1_toggle();                
     }
     
+    PT_END(pt);
+}
+/*---------------------------------------------------------------------------*/
+static
+PT_THREAD(nrf24_thread(struct pt *pt))
+{
+    PT_BEGIN(pt);
+
+    /* init hardware pins */
+    nrf24_init();
+    
+    /* Channel #2 , payload length: 8 */
+    nrf24_config(2,8);    
+
+    /* Set the device addresses */
+    nrf24_tx_address(tx_address);
+    nrf24_rx_address(rx_address);
+
+    uint32_t counter;
+    uint16_t temp;
+    int16_t realval;    
+
+    while(1)
+    {
+        PT_WAIT_UNTIL(pt,nrf24_dataReady());
+
+        dbg(PSTR("> -------------------------------------\r\n"));        
+        
+        nrf24_getData(data_array);
+
+        temp = (data_array[0]<<8)+data_array[1];
+
+        realval  = temp * 10;
+        realval /= 11;             
+        realval -= 500;
+
+        dbg(PSTR("> RAW Temp: %u\r\n"),temp);
+        dbg(PSTR("> Temp: %u\r\n"),realval);
+
+        temp = (data_array[2]<<8)+data_array[3];
+
+        dbg(PSTR("> Batt: %u\r\n"),temp);
+
+        counter = (data_array[4]<<24)+(data_array[5]<<16)+(data_array[6]<<8)+data_array[7]; 
+
+        dbg(PSTR("> Counter: %u\r\n"),counter);
+
+    }
+
     PT_END(pt);
 }
 /*---------------------------------------------------------------------------*/
@@ -530,6 +587,7 @@ int main(void)
 
     /* init protothreads */
     PT_INIT(&blink_pt);    
+    PT_INIT(&nrf24_pt);
     PT_INIT(&www_client_pt);
     PT_INIT(&www_server_pt);
     PT_INIT(&udp_server_pt);
@@ -595,7 +653,8 @@ int main(void)
 
             new_packet = 0xFF;
             
-            PT_SCHEDULE(blink_thread(&blink_pt));            
+            PT_SCHEDULE(blink_thread(&blink_pt));      
+            PT_SCHEDULE(nrf24_thread(&nrf24_pt));                  
             PT_SCHEDULE(www_server_thread(&www_server_pt));
             PT_SCHEDULE(udp_server_thread(&udp_server_pt));
             PT_SCHEDULE(www_client_thread(&www_client_pt));

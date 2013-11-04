@@ -52,7 +52,7 @@
 #define MYWWWPORT 80
 #define MYUDPPORT 1200
 #define COAPPORT 5683
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 750
 /*---------------------------------------------------------------------------*/
 #define udp_server_flag 0
 #define www_server_flag 1
@@ -73,6 +73,7 @@ static struct pt www_server_pt;
 static struct pt udp_server_pt;
 static struct pt www_client_pt;
 static struct pt coap_server_pt;
+static struct pt temperature_pt;
 static struct pt udp_broadcast_pt;
 /*---------------------------------------------------------------------------*/
 static coap_packet_t pkt;
@@ -86,10 +87,13 @@ static uint16_t dat_p;
 static uint8_t retry_count;
 volatile uint8_t new_packet;
 static uint8_t dhcp_counter;
+static uint16_t temp_result;
 static uint8_t timer1_counter;
+static uint8_t temp_sampl_cnt;
 static uint8_t buf[BUFFER_SIZE+1];
 volatile uint8_t www_callback_state;
 volatile uint16_t www_client_counter;
+volatile uint16_t temperature_counter;
 /*---------------------------------------------------------------------------*/
 static uint8_t gwip[4];
 static uint8_t gwmac[6];
@@ -106,7 +110,8 @@ ISR(TIMER1_COMPA_vect) /* 100ms intervals */
 {
     dhcp_counter++;
     timer1_counter++;
-    www_client_counter++;        
+    www_client_counter++;  
+    temperature_counter++;      
     if(dhcp_counter == 60)
     {
         dhcp_counter = 0;
@@ -140,7 +145,7 @@ void browserresult_callback(uint16_t webstatuscode,uint16_t datapos,uint16_t len
     #if 1
         uint16_t qx;
         uint16_t qxx;        
-        
+
         dbg(PSTR("> -------------------------------------\r\n"));
         dbg(PSTR("> Returned actual message: \r\n"));
         dbg(PSTR("> -------------------------------------\r\n"));        
@@ -228,6 +233,42 @@ PT_THREAD(www_server_thread(struct pt *pt))
 }
 /*---------------------------------------------------------------------------*/
 static
+PT_THREAD(temperature_thread(struct pt *pt))
+{
+    PT_BEGIN(pt);
+
+    init_adc(5);
+    disable_digital_buffer(5);
+
+    while(1)
+    {
+        cli();
+        
+        temperature_counter = 0;
+        
+        sei();
+
+        PT_WAIT_UNTIL(pt,temperature_counter > 100);
+
+        temp_result = 0;
+        temp_sampl_cnt = 0;
+     
+        for(temp_sampl_cnt = 0; temp_sampl_cnt < 64; temp_sampl_cnt++)
+        {    
+            start_conversion();
+        
+            PT_WAIT_UNTIL(pt,!is_adc_busy());
+
+            temp_result += read_adc();
+        }        
+
+        dbg(PSTR("> result: %u\r\n"),temp_result >> 6);
+    }
+
+    PT_END(pt);
+}
+/*---------------------------------------------------------------------------*/
+static
 PT_THREAD(udp_server_thread(struct pt *pt))
 {
     PT_BEGIN(pt);
@@ -266,9 +307,7 @@ PT_THREAD(blink_thread(struct pt *pt))
     PT_BEGIN(pt);
     
     while(1)
-    {
-        led1_high();
-        
+    {        
         cli();
         
         timer1_counter = 0;
@@ -277,15 +316,7 @@ PT_THREAD(blink_thread(struct pt *pt))
         
         PT_WAIT_UNTIL(pt,timer1_counter > 5);
 
-        led1_low();
-        
-        cli();
-        
-        timer1_counter = 0;
-        
-        sei();
-        
-        PT_WAIT_UNTIL(pt,timer1_counter > 5);
+        led1_toggle();                
     }
     
     PT_END(pt);
@@ -436,7 +467,7 @@ PT_THREAD(www_client_thread(struct pt *pt))
                 
                 client_browse_url(
                     PSTR("/ws.php?c="), /* constant part of the URL suffix */
-                    "London", /* variable part of the URL which comes after the constant suffix */
+                    "Samsun", /* variable part of the URL which comes after the constant suffix */
                     URL_base_address, /* base-name of the web page we want to browse */
                     &browserresult_callback, /* callback function for our URL browsing attempt */
                     otherside_www_ip, /* IP representation of the webpage host */
@@ -498,11 +529,12 @@ int main(void)
     led2_high();
 
     /* init protothreads */
-    PT_INIT(&blink_pt);
+    PT_INIT(&blink_pt);    
     PT_INIT(&www_client_pt);
     PT_INIT(&www_server_pt);
     PT_INIT(&udp_server_pt);
     PT_INIT(&coap_server_pt);    
+    PT_INIT(&temperature_pt);
     PT_INIT(&udp_broadcast_pt);
 
     /* greeting message */
@@ -563,11 +595,12 @@ int main(void)
 
             new_packet = 0xFF;
             
-            PT_SCHEDULE(blink_thread(&blink_pt));
+            PT_SCHEDULE(blink_thread(&blink_pt));            
             PT_SCHEDULE(www_server_thread(&www_server_pt));
             PT_SCHEDULE(udp_server_thread(&udp_server_pt));
             PT_SCHEDULE(www_client_thread(&www_client_pt));
             PT_SCHEDULE(coap_server_thread(&coap_server_pt));
+            PT_SCHEDULE(temperature_thread(&temperature_pt));
             PT_SCHEDULE(udp_broadcast_thread(&udp_broadcast_pt));
         }
     }    

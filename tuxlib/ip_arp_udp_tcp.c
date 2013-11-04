@@ -1189,6 +1189,7 @@ uint16_t www_client_internal_datafill_callback(uint8_t fd){
                         // if we don't use HTTP/1.1 + Connection: close
                         len=fill_tcp_data_p(bufptr,len,PSTR(" HTTP/1.1\r\nHost: "));
                         len=fill_tcp_data(bufptr,len,client_hoststr);
+                        // len=fill_tcp_data_p(bufptr,len,PSTR("\r\n Connection: close"));
                         len=fill_tcp_data_p(bufptr,len,PSTR("\r\nUser-Agent: tgr/1.1\r\nAccept: text/html\r\n\r\n"));
                 }else{
                         // POST

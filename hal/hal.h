@@ -10,4 +10,5 @@
 #include "digital.h"
 #include "hal_hci.h"
 #include "hal_timer.h"
+#include "hal_analog.h"
 #include "hal_serial.h"

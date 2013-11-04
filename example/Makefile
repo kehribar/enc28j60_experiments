@@ -10,7 +10,7 @@ PROJECT = main
 ### Source files and search directory
 CSRC    = main.c 
 CSRC   += dhcp_client.c dnslkup.c enc28j60.c ip_arp_udp_tcp.c websrv_help_functions.c
-CSRC   += hal_hci.c hal_serial.c hal_timer.c
+CSRC   += hal_hci.c hal_serial.c hal_timer.c hal_analog.c
 CSRC   += coap.c endpoints.c
 ASRC    = xitoa.S
 VPATH   = ../tuxlib ../hal ../microcoap
@@ -67,7 +67,13 @@ PROJECT   := $(OBJDIR)/$(PROJECT)
 
 # Flags for C files
 CFLAGS += -Wno-deprecated-declarations -D__PROG_TYPES_COMPAT__
-CFLAGS += -fdata-sections -ffunction-sections
+CFLAGS += -fdata-sections -ffunction-sections 
+
+# http://sourceforge.net/apps/mediawiki/mobilechessboar/index.php?title=Avr-gcc 
+# CFLAGS += -mstrict-X -fno-inline-small-functions -fno-move-loop-invariants -fno-optimize-sibling-calls -maccumulate-args
+# CFLAGS += -fno-split-wide-types -fno-tree-loop-optimize -fno-tree-switch-conversion -maccumulate-args
+# CFLAGS += -fno-dse -fno-caller-saves -fno-tree-ter
+
 CFLAGS += -Wl,--gc-sections
 CFLAGS += -std=$(CSTD)
 CFLAGS += -g$(DEBUG)

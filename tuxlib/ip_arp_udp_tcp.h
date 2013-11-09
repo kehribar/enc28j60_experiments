@@ -160,6 +160,7 @@ extern void client_http_post(const prog_char *urlbuf, char *urlbuf_varpart,const
 // void browserresult_callback(uint16_t webstatuscode,uint16_t datapos,uint16_t len)
 // webstatuscode is zero if there was no proper reply from the server (garbage message total communication failure, this is rare).
 // webstatuscode is otherwise the http status code (e.g webstatuscode=200 for 200 OK);
+void client_http_put(const prog_char *urlbuf, const char *urlbuf_varpart,const char *hoststr, const prog_char *additionalheaderline,char *postval,void (*callback)(uint16_t,uint16_t,uint16_t),uint8_t *dstip,uint8_t *dstmac);
 #endif
 
 #ifdef NTP_client

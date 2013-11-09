@@ -1191,7 +1191,9 @@ uint16_t www_client_internal_datafill_callback(uint8_t fd){
                         len=fill_tcp_data(bufptr,len,client_hoststr);
                         // len=fill_tcp_data_p(bufptr,len,PSTR("\r\n Connection: close"));
                         len=fill_tcp_data_p(bufptr,len,PSTR("\r\nUser-Agent: tgr/1.1\r\nAccept: text/html\r\n\r\n"));
-                }else{
+                }
+                else if(browsertype==1)
+                {
                         // POST
                         len=fill_tcp_data_p(bufptr,0,PSTR("POST "));
                         len=fill_tcp_data_p(bufptr,len,client_urlbuf);
@@ -1207,8 +1209,30 @@ uint16_t www_client_internal_datafill_callback(uint8_t fd){
                         itoa(strlen(client_postval),strbuf,10);
                         len=fill_tcp_data(bufptr,len,strbuf);
                         len=fill_tcp_data_p(bufptr,len,PSTR("\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n"));
-                        len=fill_tcp_data(bufptr,len,client_postval);
+                        len=fill_tcp_data(bufptr,len,client_postval);                      
                 }
+                /* --------------------------------------------*/
+                /* Added by ihsan Kehribar */
+                else if(browsertype==2)
+                {
+                    // PUT
+                    len=fill_tcp_data_p(bufptr,0,PSTR("PUT "));
+                    len=fill_tcp_data_p(bufptr,len,client_urlbuf);
+                    len=fill_tcp_data(bufptr,len,client_urlbuf_var);
+                    len=fill_tcp_data_p(bufptr,len,PSTR(" HTTP/1.1\r\nHost: "));
+                    len=fill_tcp_data(bufptr,len,client_hoststr);
+                    if (client_additionalheaderline){
+                            len=fill_tcp_data_p(bufptr,len,PSTR("\r\n"));
+                            len=fill_tcp_data_p(bufptr,len,client_additionalheaderline);
+                    }
+                    len=fill_tcp_data_p(bufptr,len,PSTR("\r\nUser-Agent: tgr/1.1\r\nAccept: */*\r\n"));
+                    len=fill_tcp_data_p(bufptr,len,PSTR("Content-Length: "));
+                    itoa(strlen(client_postval),strbuf,10);
+                    len=fill_tcp_data(bufptr,len,strbuf);
+                    len=fill_tcp_data_p(bufptr,len,PSTR("\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n"));
+                    len=fill_tcp_data(bufptr,len,client_postval);   
+                }
+                /* --------------------------------------------*/
                 return(len);
         }
         return(0);
@@ -1293,6 +1317,30 @@ void client_http_post(const prog_char *urlbuf, const char *urlbuf_varpart,const 
         client_browser_callback=callback;
         www_fd=client_tcp_req(&www_client_internal_result_callback,&www_client_internal_datafill_callback,80,dstip,dstmac);
 }
+
+/* --------------------------------------------*/
+/* Added by ihsan Kehribar */
+// client web browser using http PUT operation:
+// additionalheaderline must be set to NULL if not used.
+// The string buffers to which urlbuf_varpart and hoststr are pointing
+// must not be changed until the callback is executed.
+// postval is a string buffer which can only be de-allocated by the caller 
+// when the post operation was really done (e.g when callback was executed).
+// postval must be urlencoded.
+void client_http_put(const prog_char *urlbuf, const char *urlbuf_varpart,const char *hoststr, const prog_char *additionalheaderline,char *postval,void (*callback)(uint16_t,uint16_t,uint16_t),uint8_t *dstip,uint8_t *dstmac)
+{
+        if (!enc28j60linkup())return;
+        client_urlbuf=urlbuf;
+        client_hoststr=hoststr;
+        client_urlbuf_var=urlbuf_varpart;
+        client_additionalheaderline=additionalheaderline;
+        client_postval=postval;
+        browsertype=2;
+        client_browser_callback=callback;
+        www_fd=client_tcp_req(&www_client_internal_result_callback,&www_client_internal_datafill_callback,80,dstip,dstmac);
+}
+/* --------------------------------------------*/
+
 #endif // WWW_client
 
 void register_ping_rec_callback(void (*callback)(uint8_t *srcip))
